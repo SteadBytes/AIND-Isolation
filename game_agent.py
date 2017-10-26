@@ -112,6 +112,7 @@ class IsolationPlayer:
         positive value large enough to allow the function to return before the
         timer expires.
     """
+
     def __init__(self, search_depth=3, score_fn=custom_score, timeout=10.):
         self.search_depth = search_depth
         self.score = score_fn
@@ -211,9 +212,41 @@ class MinimaxPlayer(IsolationPlayer):
         """
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
+        moves = game.get_legal_moves(self)
+        max_util = float("-inf")
+        best_move = None
+        for move in moves:
+            v = self.min_value(game.forecast_move(move), 1)
+            if v > max_util:
+                max_util = v
+                best_move = move
+        return best_move
 
-        # TODO: finish this function!
-        raise NotImplementedError
+    def min_value(self, game, depth):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+        if depth >= self.search_depth:
+            return self.score(game, self)
+        moves = game.get_legal_moves(game.get_opponent(self))
+        if len(moves) == 0:
+            return self.score(game, self)
+        v = float("inf")
+        for move in moves:
+            v = min(v, self.max_value(game.forecast_move(move), depth + 1))
+        return v
+
+    def max_value(self, game, depth):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+        if depth >= self.search_depth:
+            return self.score(game, self)
+        moves = game.get_legal_moves(self)
+        v = float("-inf")
+        if len(moves) == 0:
+            return self.score(game, self)
+        for move in moves:
+            v = max(v, self.min_value(game.forecast_move(move), depth + 1))
+        return v
 
 
 class AlphaBetaPlayer(IsolationPlayer):
