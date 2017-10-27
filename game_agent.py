@@ -45,7 +45,7 @@ def chase_opponent_score(game, player):
     """ Rewards moves which minimize the distance between the current player
     and their opponent
 
-    Returns the negation of the distance between players -> closer distance = 
+    Returns the negation of the distance between players -> closer distance =
     higher value
     """
     own_loc = game.get_player_location(player)
@@ -299,8 +299,8 @@ class MinimaxPlayer(IsolationPlayer):
         max_util = float("-inf")
         best_move = None
         for move in moves:
-            v = self.min_value(game.forecast_move(move), 1)
-            if v > max_util:
+            v = self.min_value(game.forecast_move(move), depth - 1)
+            if v >= max_util:
                 max_util = v
                 best_move = move
         return best_move
@@ -308,27 +308,23 @@ class MinimaxPlayer(IsolationPlayer):
     def min_value(self, game, depth):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
-        if depth >= self.search_depth:
-            return self.score(game, self)
         moves = game.get_legal_moves()
-        if len(moves) == 0:
+        if depth == 0 or len(moves) == 0:
             return self.score(game, self)
         v = float("inf")
         for move in moves:
-            v = min(v, self.max_value(game.forecast_move(move), depth + 1))
+            v = min(v, self.max_value(game.forecast_move(move), depth - 1))
         return v
 
     def max_value(self, game, depth):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
-        if depth >= self.search_depth:
-            return self.score(game, self)
         moves = game.get_legal_moves()
-        if len(moves) == 0:
+        if depth == 0 or len(moves) == 0:
             return self.score(game, self)
         v = float("-inf")
         for move in moves:
-            v = max(v, self.min_value(game.forecast_move(move), depth + 1))
+            v = max(v, self.min_value(game.forecast_move(move), depth - 1))
         return v
 
 
@@ -379,8 +375,8 @@ class AlphaBetaPlayer(IsolationPlayer):
             # raised when the timer is about to expire.
             d = 0
             while True:
-                best_move = self.alphabeta(game, d)
                 d += 1
+                best_move = self.alphabeta(game, d)
 
         except SearchTimeout:
             pass  # Handle any actions required after timeout as needed
