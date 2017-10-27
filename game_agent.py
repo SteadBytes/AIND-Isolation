@@ -11,6 +11,32 @@ class SearchTimeout(Exception):
     pass
 
 
+def heuristic_decorator(func):
+    """ Checks if a game has been won or lost for the given state and returns
+    +inf/-inf accordingly before using a heuristic function as heuristic not 
+    used on terminal game states.
+    Args:
+        func: Heuristic in form heuristic_func(game,player,*args,**kwargs)
+    """
+    @wraps(f)
+    def wrapper(game, player, *args, ** kwargs):
+        win_loss_utility = game.utility(player)
+        # game.utility() returns 0 if game is not won or lost
+        if win_loss_utility != 0:
+            return win_loss_utility
+        else:
+            # game still in progress -> use heuristic to determine value
+            return func(game, player, *args, **kwargs)
+    return wrapper
+
+
+@heuristic_decorator
+def moves_count_heuristic(game, player):
+    """ Value of game board = numebr of moves available to current player
+    """
+    return float(len(game.get_legal_moves(player)))
+
+
 def custom_score(game, player):
     """Calculate the heuristic value of a game state from the point of view
     of the given player.
@@ -35,8 +61,7 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-    # TODO: finish this function!
-    raise NotImplementedError
+    return moves_count_heuristic(game, player)
 
 
 def custom_score_2(game, player):
