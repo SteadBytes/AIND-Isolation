@@ -3,6 +3,7 @@ test your agent's strength against a set of known agents using tournament.py
 and include the results in your report.
 """
 import random
+from functools import wraps
 
 
 class SearchTimeout(Exception):
@@ -212,7 +213,7 @@ class MinimaxPlayer(IsolationPlayer):
         """
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
-        moves = game.get_legal_moves(self)
+        moves = game.get_legal_moves()
         max_util = float("-inf")
         best_move = None
         for move in moves:
@@ -227,7 +228,7 @@ class MinimaxPlayer(IsolationPlayer):
             raise SearchTimeout()
         if depth >= self.search_depth:
             return self.score(game, self)
-        moves = game.get_legal_moves(game.get_opponent(self))
+        moves = game.get_legal_moves()
         if len(moves) == 0:
             return self.score(game, self)
         v = float("inf")
@@ -240,10 +241,10 @@ class MinimaxPlayer(IsolationPlayer):
             raise SearchTimeout()
         if depth >= self.search_depth:
             return self.score(game, self)
-        moves = game.get_legal_moves(self)
-        v = float("-inf")
+        moves = game.get_legal_moves()
         if len(moves) == 0:
             return self.score(game, self)
+        v = float("-inf")
         for move in moves:
             v = max(v, self.min_value(game.forecast_move(move), depth + 1))
         return v
@@ -287,8 +288,23 @@ class AlphaBetaPlayer(IsolationPlayer):
         """
         self.time_left = time_left
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        # Initialize the best move so that this function returns something
+        # in case the search fails due to timeout
+        best_move = (-1, -1)
+
+        try:
+            # The try/except block will automatically catch the exception
+            # raised when the timer is about to expire.
+            d = 0
+            while True:
+                best_move = self.alphabeta(game, d)
+                d += 1
+
+        except SearchTimeout:
+            pass  # Handle any actions required after timeout as needed
+
+        # Return the best move from the last completed search iteration
+        return best_move
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf")):
         """Implement depth-limited minimax search with alpha-beta pruning as
@@ -338,5 +354,49 @@ class AlphaBetaPlayer(IsolationPlayer):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        moves = game.get_legal_moves()
+        best_move = None
+        max_util = float("-inf")
+        for move in moves:
+            v = self.min_value(game.forecast_move(move),
+                               depth - 1, alpha, beta)
+            if v > max_util:
+                best_move = move
+                max_util = v
+            if v >= beta:
+                return best_move
+            alpha = max(alpha, v)
+        return best_move
+
+    def min_value(self, game, depth, alpha, beta):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+        moves = game.get_legal_moves()
+        if depth == 0 or len(moves) == 0:
+            return self.score(game, self)
+
+        v = float("inf")
+        for move in moves:
+            v = min(v, self.max_value(
+                game.forecast_move(move), depth - 1, alpha, beta))
+
+            if v <= alpha:
+                return v
+            beta = min(beta, v)
+        return v
+
+    def max_value(self, game, depth, alpha, beta):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+        moves = game.get_legal_moves()
+        if depth == 0 or len(moves) == 0:
+            return self.score(game, self)
+
+        v = float("-inf")
+        for move in moves:
+            v = max(v, self.min_value(
+                game.forecast_move(move), depth - 1, alpha, beta))
+            if v >= beta:
+                return v
+            alpha = max(alpha, v)
+        return v
