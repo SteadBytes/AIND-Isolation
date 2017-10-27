@@ -3,7 +3,7 @@ test your agent's strength against a set of known agents using tournament.py
 and include the results in your report.
 """
 import random
-from functools import wraps
+import math
 
 
 class SearchTimeout(Exception):
@@ -13,12 +13,12 @@ class SearchTimeout(Exception):
 
 def heuristic_decorator(func):
     """ Checks if a game has been won or lost for the given state and returns
-    +inf/-inf accordingly before using a heuristic function as heuristic not 
+    +inf/-inf accordingly before using a heuristic function as heuristic not
     used on terminal game states.
     Args:
         func: Heuristic in form heuristic_func(game,player,*args,**kwargs)
     """
-    @wraps(f)
+    # Would use functools.wraps but imports not allowed in project grading
     def wrapper(game, player, *args, ** kwargs):
         win_loss_utility = game.utility(player)
         # game.utility() returns 0 if game is not won or lost
@@ -31,10 +31,69 @@ def heuristic_decorator(func):
 
 
 @heuristic_decorator
-def moves_count_heuristic(game, player):
-    """ Value of game board = numebr of moves available to current player
+def moves_difference_score(game, player):
+    """ Value of game board = difference between number of moves for each player
+    More moves current player has, the better.
     """
-    return float(len(game.get_legal_moves(player)))
+    opponent = game.get_opponent(player)
+    opponent_moves = game.get_legal_moves(opponent)
+    return float(len(game.get_legal_moves()) - len(opponent_moves))
+
+
+@heuristic_decorator
+def chase_opponent_score(game, player):
+    """ Rewards moves which minimize the distance between the current player
+    and their opponent
+
+    Returns the negation of the distance between players -> closer distance = 
+    higher value
+    """
+    own_loc = game.get_player_location(player)
+    opp_loc = game.get_player_location(game.get_opponent(player))
+
+    # first ply -> players not on board yet
+    if own_loc is None or opp_loc is None:
+        return 0
+    dist = math.sqrt(pow(own_loc[0] + opp_loc[0], 2) +
+                     pow(own_loc[1] + opp_loc[1], 2))
+    return -dist
+
+
+@heuristic_decorator
+def avoid_corners_score(game, player):
+    """ Same as moves_difference but penalises moves that put current player in
+    the corners of the board and reward for moves that put opponent in corner
+    """
+    penalty = 1.0
+
+    own_loc = game.get_player_location(player)
+    opp_loc = game.get_player_location(game.get_opponent(player))
+
+    own_moves = game.get_legal_moves(player)
+    opp_moves = game.get_legal_moves(game.get_opponent(player))
+
+    # first ply -> players not on board yet
+    if own_loc is None or opp_loc is None:
+        return 0
+
+    corners = [(0, 0), (0, game.width - 1), (game.height - 1, 0),
+               (game.height - 1, game.width - 1)]
+    own_corner_moves = [move for move in own_moves if move in corners]
+    opp_corner_moves = [move for move in opp_moves if move in corners]
+
+    total_penalty = len(own_corner_moves) * penalty
+    total_reward = len(opp_corner_moves) * penalty
+
+    return float((len(own_moves) - total_penalty) -
+                 (len(opp_moves) + total_reward))
+
+
+@heuristic_decorator
+def move_difference_partition(game, player):
+    """ Same as moves_difference but weighted towards moves which create
+    a partition in the game board??
+    """
+    pass
 
 
 def custom_score(game, player):
@@ -61,7 +120,7 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-    return moves_count_heuristic(game, player)
+    return moves_difference_score(game, player)
 
 
 def custom_score_2(game, player):
@@ -86,8 +145,7 @@ def custom_score_2(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-    # TODO: finish this function!
-    raise NotImplementedError
+    return chase_opponent_score(game, player)
 
 
 def custom_score_3(game, player):
@@ -112,8 +170,7 @@ def custom_score_3(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-    # TODO: finish this function!
-    raise NotImplementedError
+    return avoid_corners_score(game, player)
 
 
 class IsolationPlayer:
