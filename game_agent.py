@@ -60,12 +60,52 @@ def chase_opponent_score(game, player):
 
 
 @heuristic_decorator
+def weighted_chase_opponent_score(game, player):
+    weight = 1.0
+
+    own_loc = game.get_player_location(player)
+    opp_loc = game.get_player_location(game.get_opponent(player))
+
+    # first ply -> players not on board yet
+    if own_loc is None or opp_loc is None:
+        return 0
+
+    # < 1/4 blanks spaces = near end game
+    if (len(game.get_blank_spaces()) / (game.width * game.height)) < 0.25:
+        weight = 4
+
+    dist = math.sqrt(pow(own_loc[0] + opp_loc[0], 2) +
+                     pow(own_loc[1] + opp_loc[1], 2))
+    return -dist / weight
+
+
+def get_moves(game, loc):
+    r, c = loc
+    directions = [(-2, -1), (-2, 1), (-1, -2), (-1, 2),
+                  (1, -2), (1, 2), (2, -1), (2, 1)]
+    valid_moves = [(r + dr, c + dc) for dr, dc in directions
+                   if game.move_is_legal((r + dr, c + dc))]
+    return valid_moves
+
+
+@heuristic_decorator
+def next_moves_score(game, player):
+    own_moves = game.get_legal_moves(player)
+    opp_moves = game.get_legal_moves(game.get_opponent(player))
+
+    own_next_moves = set(
+        [_m for move in own_moves for _m in get_moves(game, move)])
+    opp_next_moves = set(
+        [_m for move in opp_moves for _m in get_moves(game, move)])
+    return len(own_next_moves) - len(opp_next_moves) + len(own_moves) - len(opp_moves)
+
+
+@heuristic_decorator
 def avoid_corners_score(game, player):
     """ Same as moves_difference but penalises moves that put current player in
     the corners of the board and reward for moves that put opponent in corner
     """
     penalty = 1.0
-
     own_loc = game.get_player_location(player)
     opp_loc = game.get_player_location(game.get_opponent(player))
 
@@ -89,11 +129,68 @@ def avoid_corners_score(game, player):
 
 
 @heuristic_decorator
-def move_difference_partition(game, player):
-    """ Same as moves_difference but weighted towards moves which create
-    a partition in the game board??
+def variable_weight_avoid_corners_score(game, player):
+    """ Same as moves_difference but penalises moves that put current player in
+    the corners of the board and reward for moves that put opponent in corner.
+    Penalties weighted more heavily towards the end of the game
     """
-    pass
+    penalty = 1.0
+
+    own_loc = game.get_player_location(player)
+    opp_loc = game.get_player_location(game.get_opponent(player))
+
+    own_moves = game.get_legal_moves(player)
+    opp_moves = game.get_legal_moves(game.get_opponent(player))
+
+    # first ply -> players not on board yet
+    if own_loc is None or opp_loc is None:
+        return 0
+
+    # < 1/4 blanks spaces = near end game
+    # moving into corners now is very dangerous -> increase weighting
+    if (len(game.get_blank_spaces()) / (game.width * game.height)) < 0.25:
+        penalty = 4
+
+    corners = [(0, 0), (0, game.width - 1), (game.height - 1, 0),
+               (game.height - 1, game.width - 1)]
+    own_corner_moves = [move for move in own_moves if move in corners]
+    opp_corner_moves = [move for move in opp_moves if move in corners]
+
+    total_penalty = len(own_corner_moves) * penalty
+    total_reward = len(opp_corner_moves) * penalty
+
+    return float((len(own_moves) - total_penalty) -
+                 (len(opp_moves) + total_reward))
+
+
+@heuristic_decorator
+def avoid_tight_spaces(game, player):
+    """Gives greater weighting to moves which do not result in tight spaces.
+
+    Check 3x3 area produced by the position of the player and their legal moves
+    More legal mo ves in 3x3 area = less tight space = better
+    Converse for opponent
+    """
+    penalty = 1
+    vectors_3x3 = [(1, 2), (-1, 2), (-1, -2), (2, 1),
+                   (2, -1), (-2, 1), (-2, -1)]
+    own_loc = game.get_player_location(player)
+    opp_loc = game.get_player_location(game.get_opponent(player))
+
+    own_moves = game.get_legal_moves(player)
+    opp_moves = game.get_legal_moves(game.get_opponent(player))
+
+    # get number of vectors which are legal
+    own_legal_moves_3x3 = [move for move in [tuple(
+        map(lambda x, y: x + y, v, own_loc))for v in vectors_3x3] if move in own_moves]
+    opp_legal_moves_3x3 = [move for move in [tuple(
+        map(lambda x, y: x + y, v, opp_loc))for v in vectors_3x3] if move in opp_moves]
+
+    own_reward = len(own_legal_moves_3x3) * penalty
+    opp_penalty = len(opp_legal_moves_3x3) * penalty
+
+    return float((len(own_moves) + own_reward) -
+                 (len(opp_moves) - opp_penalty))
 
 
 def custom_score(game, player):
@@ -120,7 +217,7 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-    return moves_difference_score(game, player)
+    return avoid_corners_score(game, player)
 
 
 def custom_score_2(game, player):
@@ -145,7 +242,7 @@ def custom_score_2(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-    return chase_opponent_score(game, player)
+    return next_moves_score(game, player)
 
 
 def custom_score_3(game, player):
@@ -170,7 +267,7 @@ def custom_score_3(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-    return avoid_corners_score(game, player)
+    return next_moves_score(game, player)
 
 
 class IsolationPlayer:
@@ -241,7 +338,11 @@ class MinimaxPlayer(IsolationPlayer):
 
         # Initialize the best move so that this function returns something
         # in case the search fails due to timeout
-        best_move = (-1, -1)
+        moves = game.get_legal_moves()
+        if len(moves) == 0:
+            best_move = (-1, -1)
+        else:
+            best_move = moves[0]
 
         try:
             # The try/except block will automatically catch the exception
@@ -368,15 +469,19 @@ class AlphaBetaPlayer(IsolationPlayer):
 
         # Initialize the best move so that this function returns something
         # in case the search fails due to timeout
-        best_move = (-1, -1)
+        moves = game.get_legal_moves()
+        if len(moves) == 0:
+            best_move = (-1, -1)
+        else:
+            best_move = moves[0]
 
         try:
             # The try/except block will automatically catch the exception
             # raised when the timer is about to expire.
-            d = 0
+            d = 1
             while True:
-                d += 1
                 best_move = self.alphabeta(game, d)
+                d += 1
 
         except SearchTimeout:
             pass  # Handle any actions required after timeout as needed
