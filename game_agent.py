@@ -76,7 +76,7 @@ def weighted_chase_opponent_score(game, player):
 
     dist = math.sqrt(pow(own_loc[0] + opp_loc[0], 2) +
                      pow(own_loc[1] + opp_loc[1], 2))
-    return -dist / weight
+    return float(-dist / weight)
 
 
 def get_moves(game, loc):
@@ -97,7 +97,8 @@ def next_moves_score(game, player):
         [_m for move in own_moves for _m in get_moves(game, move)])
     opp_next_moves = set(
         [_m for move in opp_moves for _m in get_moves(game, move)])
-    return len(own_next_moves) - len(opp_next_moves) + len(own_moves) - len(opp_moves)
+    return float(len(own_next_moves) - len(opp_next_moves) +
+                 len(own_moves) - len(opp_moves))
 
 
 @heuristic_decorator
@@ -109,12 +110,12 @@ def avoid_corners_score(game, player):
     own_loc = game.get_player_location(player)
     opp_loc = game.get_player_location(game.get_opponent(player))
 
-    own_moves = game.get_legal_moves(player)
-    opp_moves = game.get_legal_moves(game.get_opponent(player))
-
     # first ply -> players not on board yet
     if own_loc is None or opp_loc is None:
         return 0
+
+    own_moves = game.get_legal_moves(player)
+    opp_moves = game.get_legal_moves(game.get_opponent(player))
 
     corners = [(0, 0), (0, game.width - 1), (game.height - 1, 0),
                (game.height - 1, game.width - 1)]
@@ -139,12 +140,12 @@ def variable_weight_avoid_corners_score(game, player):
     own_loc = game.get_player_location(player)
     opp_loc = game.get_player_location(game.get_opponent(player))
 
-    own_moves = game.get_legal_moves(player)
-    opp_moves = game.get_legal_moves(game.get_opponent(player))
-
     # first ply -> players not on board yet
     if own_loc is None or opp_loc is None:
         return 0
+
+    own_moves = game.get_legal_moves(player)
+    opp_moves = game.get_legal_moves(game.get_opponent(player))
 
     # < 1/4 blanks spaces = near end game
     # moving into corners now is very dangerous -> increase weighting
@@ -172,19 +173,25 @@ def avoid_tight_spaces(game, player):
     Converse for opponent
     """
     penalty = 1
+
     vectors_3x3 = [(1, 2), (-1, 2), (-1, -2), (2, 1),
                    (2, -1), (-2, 1), (-2, -1)]
     own_loc = game.get_player_location(player)
     opp_loc = game.get_player_location(game.get_opponent(player))
 
+    # first ply -> players not on board yet
+    if own_loc is None or opp_loc is None:
+        return 0
+
     own_moves = game.get_legal_moves(player)
     opp_moves = game.get_legal_moves(game.get_opponent(player))
 
-    # get number of vectors which are legal
+    # get legal moves within the 3x3 area -> represents a players potential
+    # tight space mobility after making a move
     own_legal_moves_3x3 = [move for move in [tuple(
-        map(lambda x, y: x + y, v, own_loc))for v in vectors_3x3] if move in own_moves]
+        map(lambda x, y: x + y, v, own_loc)) for v in vectors_3x3] if move in own_moves]
     opp_legal_moves_3x3 = [move for move in [tuple(
-        map(lambda x, y: x + y, v, opp_loc))for v in vectors_3x3] if move in opp_moves]
+        map(lambda x, y: x + y, v, opp_loc)) for v in vectors_3x3] if move in opp_moves]
 
     own_reward = len(own_legal_moves_3x3) * penalty
     opp_penalty = len(opp_legal_moves_3x3) * penalty
@@ -267,7 +274,7 @@ def custom_score_3(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-    return next_moves_score(game, player)
+    return weighted_chase_opponent_score(game, player)
 
 
 class IsolationPlayer:
@@ -340,7 +347,7 @@ class MinimaxPlayer(IsolationPlayer):
         # in case the search fails due to timeout
         moves = game.get_legal_moves()
         if len(moves) == 0:
-            best_move = (-1, -1)
+            return (-1, -1)
         else:
             best_move = moves[0]
 
@@ -396,9 +403,15 @@ class MinimaxPlayer(IsolationPlayer):
         """
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
+
         moves = game.get_legal_moves()
+
+        if len(moves) == 0:
+            return (-1, -1)
+        else:
+            best_move = moves[0]
+
         max_util = float("-inf")
-        best_move = None
         for move in moves:
             v = self.min_value(game.forecast_move(move), depth - 1)
             if v >= max_util:
@@ -471,7 +484,7 @@ class AlphaBetaPlayer(IsolationPlayer):
         # in case the search fails due to timeout
         moves = game.get_legal_moves()
         if len(moves) == 0:
-            best_move = (-1, -1)
+            return (-1, -1)
         else:
             best_move = moves[0]
 
@@ -538,7 +551,12 @@ class AlphaBetaPlayer(IsolationPlayer):
             raise SearchTimeout()
 
         moves = game.get_legal_moves()
-        best_move = None
+
+        if len(moves) == 0:
+            return (-1, -1)
+        else:
+            best_move = moves[0]
+
         max_util = float("-inf")
         for move in moves:
             v = self.min_value(game.forecast_move(move),
@@ -554,6 +572,7 @@ class AlphaBetaPlayer(IsolationPlayer):
     def min_value(self, game, depth, alpha, beta):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
+
         moves = game.get_legal_moves()
         if depth == 0 or len(moves) == 0:
             return self.score(game, self)
@@ -571,6 +590,7 @@ class AlphaBetaPlayer(IsolationPlayer):
     def max_value(self, game, depth, alpha, beta):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
+
         moves = game.get_legal_moves()
         if depth == 0 or len(moves) == 0:
             return self.score(game, self)
