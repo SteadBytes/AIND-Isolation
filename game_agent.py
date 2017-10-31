@@ -34,10 +34,21 @@ def heuristic_decorator(func):
 def moves_difference_score(game, player):
     """ Value of game board = difference between number of moves for each player
     More moves current player has, the better.
+
+    Args:
+        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
+        the current state of the game (e.g.player locations and blocked cells).
+
+        player (obj):
+            A player instance in the current game (one of the player objects
+            `game.__player_1__` or `game.__player_2__`.)
+    Returns:
+        float : Heuristic value of current game state to the specified player.
     """
-    opponent = game.get_opponent(player)
-    opponent_moves = game.get_legal_moves(opponent)
-    return float(len(game.get_legal_moves()) - len(opponent_moves))
+    own_moves = game.get_legal_moves(player)
+    opp_moves = game.get_legal_moves(game.get_opponent(player))
+
+    return float(len(own_moves) - len(opp_moves))
 
 
 @heuristic_decorator
@@ -47,6 +58,16 @@ def chase_opponent_score(game, player):
 
     Returns the negation of the distance between players -> closer distance =
     higher value
+
+    Args:
+        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
+        the current state of the game (e.g.player locations and blocked cells).
+
+        player (obj):
+            A player instance in the current game (one of the player objects
+            `game.__player_1__` or `game.__player_2__`.)
+    Returns:
+        float : Heuristic value of current game state to the specified player.
     """
     own_loc = game.get_player_location(player)
     opp_loc = game.get_player_location(game.get_opponent(player))
@@ -61,6 +82,21 @@ def chase_opponent_score(game, player):
 
 @heuristic_decorator
 def weighted_chase_opponent_score(game, player):
+    """ Rewards moves which minimize the distance between the current player
+        and their opponent. Weighted more heavily towards the end of the game.
+
+        Returns the negation of the distance between players:
+        closer distance = higher value
+    Args:
+        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
+        the current state of the game (e.g.player locations and blocked cells).
+
+        player (obj):
+            A player instance in the current game (one of the player objects
+            `game.__player_1__` or `game.__player_2__`.)
+    Returns:
+        float : Heuristic value of current game state to the specified player.
+    """
     weight = 1.0
 
     own_loc = game.get_player_location(player)
@@ -80,6 +116,20 @@ def weighted_chase_opponent_score(game, player):
 
 
 def get_moves(game, loc):
+    """ Generates list of possible L-shaped moves from a specific location in
+        a game state.
+        Similar to Board.__get_moves() private method.
+
+    Args:
+        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
+        the current state of the game (e.g.player locations and blocked cells).
+
+        player (obj):
+            A player instance in the current game (one of the player objects
+            `game.__player_1__` or `game.__player_2__`.)
+    Returns:
+        list of `tuples`: (x,y) tuples of board positions
+    """
     r, c = loc
     directions = [(-2, -1), (-2, 1), (-1, -2), (-1, 2),
                   (1, -2), (1, 2), (2, -1), (2, 1)]
@@ -90,6 +140,23 @@ def get_moves(game, loc):
 
 @heuristic_decorator
 def next_moves_score(game, player):
+    """ Measures utility by difference in number of moves between the players
+    weighted by the number of possible moves available in the next turn after
+    making a move.
+
+    Number of opponent moves = penalty
+    Number of own moves = reward
+
+    Args:
+        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
+        the current state of the game (e.g.player locations and blocked cells).
+
+        player (obj):
+            A player instance in the current game (one of the player objects
+            `game.__player_1__` or `game.__player_2__`.)
+    Returns:
+        float : Heuristic value of current game state to the specified player.
+    """
     own_moves = game.get_legal_moves(player)
     opp_moves = game.get_legal_moves(game.get_opponent(player))
 
@@ -105,8 +172,18 @@ def next_moves_score(game, player):
 def avoid_corners_score(game, player):
     """ Same as moves_difference but penalises moves that put current player in
     the corners of the board and reward for moves that put opponent in corner
+
+    Args:
+        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
+        the current state of the game (e.g.player locations and blocked cells).
+
+        player (obj):
+            A player instance in the current game (one of the player objects
+            `game.__player_1__` or `game.__player_2__`.)
+    Returns:
+        float : Heuristic value of current game state to the specified player.
     """
-    penalty = 1.0
+    weight = 1.0
     own_loc = game.get_player_location(player)
     opp_loc = game.get_player_location(game.get_opponent(player))
 
@@ -122,8 +199,8 @@ def avoid_corners_score(game, player):
     own_corner_moves = [move for move in own_moves if move in corners]
     opp_corner_moves = [move for move in opp_moves if move in corners]
 
-    total_penalty = len(own_corner_moves) * penalty
-    total_reward = len(opp_corner_moves) * penalty
+    total_penalty = len(own_corner_moves) * weight
+    total_reward = len(opp_corner_moves) * weight
 
     return float((len(own_moves) - total_penalty) -
                  (len(opp_moves) + total_reward))
@@ -134,8 +211,18 @@ def variable_weight_avoid_corners_score(game, player):
     """ Same as moves_difference but penalises moves that put current player in
     the corners of the board and reward for moves that put opponent in corner.
     Penalties weighted more heavily towards the end of the game
+
+    Args:
+        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
+        the current state of the game (e.g.player locations and blocked cells).
+
+        player (obj):
+            A player instance in the current game (one of the player objects
+            `game.__player_1__` or `game.__player_2__`.)
+    Returns:
+        float : Heuristic value of current game state to the specified player.
     """
-    penalty = 1.0
+    weight = 1.0
 
     own_loc = game.get_player_location(player)
     opp_loc = game.get_player_location(game.get_opponent(player))
@@ -157,8 +244,8 @@ def variable_weight_avoid_corners_score(game, player):
     own_corner_moves = [move for move in own_moves if move in corners]
     opp_corner_moves = [move for move in opp_moves if move in corners]
 
-    total_penalty = len(own_corner_moves) * penalty
-    total_reward = len(opp_corner_moves) * penalty
+    total_penalty = len(own_corner_moves) * weight
+    total_reward = len(opp_corner_moves) * weight
 
     return float((len(own_moves) - total_penalty) -
                  (len(opp_moves) + total_reward))
@@ -171,8 +258,18 @@ def avoid_tight_spaces(game, player):
     Check 3x3 area produced by the position of the player and their legal moves
     More legal mo ves in 3x3 area = less tight space = better
     Converse for opponent
+
+    Args:
+        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
+        the current state of the game (e.g.player locations and blocked cells).
+
+        player (obj):
+            A player instance in the current game (one of the player objects
+            `game.__player_1__` or `game.__player_2__`.)
+    Returns:
+        float : Heuristic value of current game state to the specified player.
     """
-    penalty = 1
+    weight = 1
 
     vectors_3x3 = [(1, 2), (-1, 2), (-1, -2), (2, 1),
                    (2, -1), (-2, 1), (-2, -1)]
@@ -193,8 +290,8 @@ def avoid_tight_spaces(game, player):
     opp_legal_moves_3x3 = [move for move in [tuple(
         map(lambda x, y: x + y, v, opp_loc)) for v in vectors_3x3] if move in opp_moves]
 
-    own_reward = len(own_legal_moves_3x3) * penalty
-    opp_penalty = len(opp_legal_moves_3x3) * penalty
+    own_reward = len(own_legal_moves_3x3) * weight
+    opp_penalty = len(opp_legal_moves_3x3) * weight
 
     return float((len(own_moves) + own_reward) -
                  (len(opp_moves) - opp_penalty))
