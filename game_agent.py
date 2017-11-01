@@ -75,6 +75,7 @@ def chase_opponent_score(game, player):
     # first ply -> players not on board yet
     if own_loc is None or opp_loc is None:
         return 0
+
     dist = math.sqrt(pow(own_loc[0] + opp_loc[0], 2) +
                      pow(own_loc[1] + opp_loc[1], 2))
     return -dist
@@ -204,97 +205,6 @@ def avoid_corners_score(game, player):
 
     return float((len(own_moves) - total_penalty) -
                  (len(opp_moves) + total_reward))
-
-
-@heuristic_decorator
-def variable_weight_avoid_corners_score(game, player):
-    """ Same as moves_difference but penalises moves that put current player in
-    the corners of the board and reward for moves that put opponent in corner.
-    Penalties weighted more heavily towards the end of the game
-
-    Args:
-        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
-        the current state of the game (e.g.player locations and blocked cells).
-
-        player (obj):
-            A player instance in the current game (one of the player objects
-            `game.__player_1__` or `game.__player_2__`.)
-    Returns:
-        float : Heuristic value of current game state to the specified player.
-    """
-    weight = 1.0
-
-    own_loc = game.get_player_location(player)
-    opp_loc = game.get_player_location(game.get_opponent(player))
-
-    # first ply -> players not on board yet
-    if own_loc is None or opp_loc is None:
-        return 0
-
-    own_moves = game.get_legal_moves(player)
-    opp_moves = game.get_legal_moves(game.get_opponent(player))
-
-    # < 1/4 blanks spaces = near end game
-    # moving into corners now is very dangerous -> increase weighting
-    if (len(game.get_blank_spaces()) / (game.width * game.height)) < 0.25:
-        penalty = 4
-
-    corners = [(0, 0), (0, game.width - 1), (game.height - 1, 0),
-               (game.height - 1, game.width - 1)]
-    own_corner_moves = [move for move in own_moves if move in corners]
-    opp_corner_moves = [move for move in opp_moves if move in corners]
-
-    total_penalty = len(own_corner_moves) * weight
-    total_reward = len(opp_corner_moves) * weight
-
-    return float((len(own_moves) - total_penalty) -
-                 (len(opp_moves) + total_reward))
-
-
-@heuristic_decorator
-def avoid_tight_spaces(game, player):
-    """Gives greater weighting to moves which do not result in tight spaces.
-
-    Check 3x3 area produced by the position of the player and their legal moves
-    More legal mo ves in 3x3 area = less tight space = better
-    Converse for opponent
-
-    Args:
-        game (obj:`isolation.Board`): An instance of `isolation.Board` encoding
-        the current state of the game (e.g.player locations and blocked cells).
-
-        player (obj):
-            A player instance in the current game (one of the player objects
-            `game.__player_1__` or `game.__player_2__`.)
-    Returns:
-        float : Heuristic value of current game state to the specified player.
-    """
-    weight = 1
-
-    vectors_3x3 = [(1, 2), (-1, 2), (-1, -2), (2, 1),
-                   (2, -1), (-2, 1), (-2, -1)]
-    own_loc = game.get_player_location(player)
-    opp_loc = game.get_player_location(game.get_opponent(player))
-
-    # first ply -> players not on board yet
-    if own_loc is None or opp_loc is None:
-        return 0
-
-    own_moves = game.get_legal_moves(player)
-    opp_moves = game.get_legal_moves(game.get_opponent(player))
-
-    # get legal moves within the 3x3 area -> represents a players potential
-    # tight space mobility after making a move
-    own_legal_moves_3x3 = [move for move in [tuple(
-        map(lambda x, y: x + y, v, own_loc)) for v in vectors_3x3] if move in own_moves]
-    opp_legal_moves_3x3 = [move for move in [tuple(
-        map(lambda x, y: x + y, v, opp_loc)) for v in vectors_3x3] if move in opp_moves]
-
-    own_reward = len(own_legal_moves_3x3) * weight
-    opp_penalty = len(opp_legal_moves_3x3) * weight
-
-    return float((len(own_moves) + own_reward) -
-                 (len(opp_moves) - opp_penalty))
 
 
 def custom_score(game, player):
