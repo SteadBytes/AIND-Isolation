@@ -16,9 +16,14 @@ class IsolationTest(unittest.TestCase):
 
     def setUp(self):
         reload(game_agent)
-        self.player1 = "Player1"
-        self.player2 = "Player2"
+        self.player1 = game_agent.AlphaBetaPlayer(
+            score_fn=game_agent.next_moves_score)
+        self.player2 = game_agent.AlphaBetaPlayer(
+            score_fn=game_agent.next_moves_score)
         self.game = isolation.Board(self.player1, self.player2)
+
+    def test_next_moves(self):
+        self.game.play()
 
 
 if __name__ == '__main__':
